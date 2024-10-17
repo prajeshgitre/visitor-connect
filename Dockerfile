@@ -1,5 +1,12 @@
-FROM registry.access.redhat.com/ubi8/php-74:1-119.1712880523
+# Use an official PHP runtime as a parent image
+FROM php:7.4-apache
 
-ADD . /opt/app-root/src
+# Copy the current directory contents into the container at /var/www/html
+COPY . /var/www/html/
 
-CMD sleep 10; $STI_SCRIPTS_PATH/ru
+# Expose port 80 to the outside world
+EXPOSE 80
+
+# Start Apache in the foreground
+CMD ["apache2-foreground"]
+
