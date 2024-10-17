@@ -63,7 +63,7 @@ steps:
           role: roles/run.invoker
         EOF
 
-        gcloud run services set-iam-policy crn-visitor-connect-prod-as1-node-admin policy.yaml --region=asia-south1 -q  
+        gcloud run services set-iam-policy crn-visitor-connect-prod-as1-php-admin policy.yaml --region=asia-south1 -q  
                           
                         
 
