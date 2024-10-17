@@ -15,7 +15,7 @@ spec:
         autoscaling.knative.dev/maxScale: "1"
     spec:
       containers:
-      - image: asia-south1-docker.pkg.dev/prj-visitor-connect-prod-goa/repo-visitor-connect-prod-as1-01/node-app:latest
+      - image: asia-south1-docker.pkg.dev/prj-visitor-connect-prod-goa/repo-visitor-connect-prod-as1-01/php-app:latest
         ports:
         - containerPort: 80
         resources:
