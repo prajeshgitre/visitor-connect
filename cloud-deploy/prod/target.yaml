@@ -4,4 +4,4 @@ metadata:
   name: prod
 description: Cloud Run development service
 run:
-  location: projects/prj-visitor-connect-prod-goa/locations/asia-south1
+  location: projects/prj-prod-goa-smartforce-86/locations/asia-south1
