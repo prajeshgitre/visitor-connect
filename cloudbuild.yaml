@@ -1,17 +1,21 @@
 steps:
+  
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
-      - 'asia-south1-docker.pkg.dev/prj-visitor-connect-prod-goa/repo-visitor-connect-prod-as1-01/php-app:latest'
+      - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
       - '.'
+ 
 
   # Step 2: Push the Docker image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'asia-south1-docker.pkg.dev/prj-visitor-connect-prod-goa/repo-visitor-connect-prod-as1-01/php-app:latest'
+      - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
+    
+
 
   # Step 3: Trigger Cloud Deploy with inline Skaffold configuration
   - name: 'google/cloud-sdk:latest'
@@ -21,29 +25,32 @@ steps:
       - -xe
       - -c
       - |
-        gcloud config set deploy/region asia-south1
-        gcloud deploy apply --file cloud-deploy/prod/pipeline.yaml
-        gcloud deploy apply --file cloud-deploy/prod/target.yaml
+    
+        gcloud deploy apply --file cloud-deploy/prod/pipeline-as1.yaml --region=asia-south1
+        gcloud deploy apply --file cloud-deploy/prod/target-as1.yaml --region=asia-south1	
 
         # Inline Skaffold configuration
-        cat <<EOF > skaffold.yaml
+        cat <<EOF > skaffold.yaml	
         apiVersion: skaffold/v4beta7
         kind: Config
         metadata:
-          name: node-app
+          name: php-client-app
         profiles:
-        - name: prod
-          manifests:
-            rawYaml:
-            - cloud-deploy/prod/prod.yaml
-        deploy:
-          cloudrun: {}
+          - name: prod-asia-south1
+            manifests:
+              rawYaml:
+                - cloud-deploy/prod/prod-as1.yaml
+            deploy:
+              cloudrun: {}
         EOF
 
-        gcloud deploy releases create php-app-${SHORT_SHA} \
-                            --delivery-pipeline=cdep-visitor-connect-prod-as1-01 \
 
-  # Step to wait for 60 seconds
+        gcloud deploy releases create php-client-app-${SHORT_SHA}-$(date +%s) \
+                            --delivery-pipeline=cdep-test --region=asia-south1
+                            
+                                        
+
+   # Step to wait for 60 seconds
   - name: 'alpine:latest'
     entrypoint: 'sh'
     args:
@@ -63,10 +70,10 @@ steps:
           role: roles/run.invoker
         EOF
 
-        gcloud run services set-iam-policy crn-visitor-connect-prod-as1-php-admin policy.yaml --region=asia-south1 -q  
+        gcloud run services set-iam-policy crn-test policy.yaml --region=asia-south1 -q  
+    
                           
                         
-
   # Step to wait for 60 seconds
   - name: 'alpine:latest'
     entrypoint: 'sh'
@@ -81,31 +88,63 @@ steps:
       - -xe
       - -c
       - |
-        lb_ip="34.149.45.148"  # Add your Load Balancer IP here
-        response=$(curl -o /dev/null -s -w "%{http_code}\n" "http://$lb_ip")
+        echo "Checking Cloud Run service status..."
+        
+        # Get service-status
+        status=$(gcloud run services describe crn-test \
+          --region=asia-south1 \
+          --format="get(status.conditions[0].status)")
+        
+        if [ "$status" = "True" ]; then
+          echo "Deployment successful!"
+          exit 0
+        fi
+        echo "Deployment failed or service is not healthy (Status: $status). Rolling back to previous version."
+            
+        # Get the previous successful release
+        prev_release=$(gcloud deploy releases list \
+          --delivery-pipeline=cdep-test \
+          --region=asia-south1 --sort-by="~createTime" --format="value(name)" | \
+          while read release; do 
+            gcloud deploy rollouts list --delivery-pipeline=cdep-test \
+              --release="$release" --region=asia-south1 --filter="state=SUCCEEDED" \
+              --format="value(name)" | grep -q . && basename "$release" && break
+          done)
 
-        # Check the status code and take action
-        if [ "$response" -eq 200 ]; then
-          echo "Deployment successful! Service is healthy."
-        elif [ "$response" -eq 500 ]; then
-          echo "Deployment failed with status 500! Rolling back..."
+        if [ -z "$prev_release" ]; then
+         echo "No previous successful release found for rollback. Exiting."
+         exit 1
+        fi  
 
-          last_release=$(gcloud deploy releases list \
-            --delivery-pipeline=cdep-visitor-connect-prod-as1-01 \
-            --region=asia-south1 \
-            --format="yaml(name)" | awk -F'/' '{split($0,a,"/"); print a[length(a)]}' | sed -n '4p')
+        echo "Rolling back to previous successful release: $prev_release"
 
-          # Rollback to the last successful release
-          gcloud deploy targets rollback prod \
-            --delivery-pipeline=cdep-visitor-connect-prod-as1-01 \
-            --region=asia-south1 \
-            --release="$last_release"
+        # Deploy previous successful release
+        gcloud deploy releases promote \
+          --delivery-pipeline=cdep-test \
+          --region=asia-south1 \
+          --release="$prev_release" \
+          --to-target=prod-asia-south1 \
+          --quiet  
+
+        echo "Waiting for rollback to complete..."
+        sleep 60
+
+        # Verify rollback
+        rollback_status=$(gcloud run services describe crn-test \
+          --region=asia-south1 \
+          --format="get(status.conditions[0].status)")
+
+        if [ "$rollback_status" = "True" ]; then
+          echo "Rollback completed successfully."
+          exit 0
         else
-          echo "Deployment failed with status $response! Exiting."
+          echo "Rollback may have failed. Service status: $rollback_status"
           exit 1
         fi
+ 
 
 images:
-  - 'asia-south1-docker.pkg.dev/prj-visitor-connect-prod-goa/repo-visitor-connect-prod-as1-01/php-app:latest'
+  - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
+ 
 
-logsBucket: 'gs://bkt-visitor-connect-prod-as1-cloudbuild-logging'
+logsBucket: 'gs://bkt-goa-prod-cloud-logging-01'
