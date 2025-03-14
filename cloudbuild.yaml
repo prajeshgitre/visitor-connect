@@ -26,8 +26,8 @@ steps:
       - -c
       - |
     
-        gcloud deploy apply --file cloud-deploy/prod/pipeline-as1.yaml --region=asia-south1
-        gcloud deploy apply --file cloud-deploy/prod/target-as1.yaml --region=asia-south1	
+        gcloud deploy apply --file cloud-deploy/prod/pipeline.yaml --region=asia-south1
+        gcloud deploy apply --file cloud-deploy/prod/target.yaml --region=asia-south1	
 
         # Inline Skaffold configuration
         cat <<EOF > skaffold.yaml	
