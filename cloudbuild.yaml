@@ -122,7 +122,7 @@ steps:
           --delivery-pipeline=cdep-test \
           --region=asia-south1 \
           --release="$prev_release" \
-          --to-target=prod-asia-south1 \
+          --to-target=prod \
           --quiet  
 
         echo "Waiting for rollback to complete..."
