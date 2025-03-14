@@ -1,3 +1,3 @@
 <?php
-echo "Hello, World!";
+ech0 "Hello, World!";  // "echo" is misspelled as "ech0"
 ?>
