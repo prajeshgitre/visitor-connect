@@ -39,7 +39,7 @@ steps:
           - name: prod-asia-south1
             manifests:
               rawYaml:
-                - cloud-deploy/prod/prod-as1.yaml
+                - cloud-deploy/prod/prod.yaml
             deploy:
               cloudrun: {}
         EOF
