@@ -34,9 +34,9 @@ steps:
         apiVersion: skaffold/v4beta7
         kind: Config
         metadata:
-          name: php-client-app
+          name: php-app-01
         profiles:
-          - name: prod-asia-south1
+          - name: prod
             manifests:
               rawYaml:
                 - cloud-deploy/prod/prod.yaml
@@ -45,7 +45,7 @@ steps:
         EOF
 
 
-        gcloud deploy releases create php-client-app-${SHORT_SHA}-$(date +%s) \
+        gcloud deploy releases create php-app-01-${SHORT_SHA}-$(date +%s) \
                             --delivery-pipeline=cdep-test --region=asia-south1
                             
                                         
