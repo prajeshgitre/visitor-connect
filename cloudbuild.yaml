@@ -91,9 +91,8 @@ steps:
         echo "Checking Cloud Run service status..."
         
         # Get service-status
-        status=$(gcloud run services describe crn-test \
-          --region=asia-south1 \
-          --format="get(status.conditions[0].status)")
+        status=$(gcloud run services describe crn-test --region=asia-south1 --format="get(status.conditions[0].status)")
+
         
         if [ "$status" = "True" ]; then
           echo "Deployment successful!"
