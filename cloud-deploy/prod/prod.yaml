@@ -22,4 +22,4 @@ spec:
           limits:
             cpu: "4000m"
             memory: 8Gi
-      serviceAccountName: sa-cloudrun@prj-visitor-connect-prod-goa.iam.gserviceaccount.com
+      serviceAccountName: sa-goa-node-01@prj-prod-goa-smartforce-86.iam.gserviceaccount.com
