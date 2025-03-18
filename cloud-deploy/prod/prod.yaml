@@ -17,7 +17,7 @@ spec:
       containers:
       - image: asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest
         ports:
-        - containerPort: 30
+        - containerPort: 80
         resources:
           limits:
             cpu: "4000m"
