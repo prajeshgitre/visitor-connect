@@ -75,7 +75,7 @@
       
                             
                           
-    # Step to wait for 60 seconds
+    # Step to wait for 120 seconds
     - name: 'alpine:latest'
       entrypoint: 'sh'
       args:
