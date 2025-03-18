@@ -1,150 +1,150 @@
-steps:
+  steps:
+    
+    # Step 1: Build the Docker image
+    - name: 'gcr.io/cloud-builders/docker'
+      args:
+        - 'build'
+        - '-t'
+        - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
+        - '.'
   
-  # Step 1: Build the Docker image
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
-      - '.'
- 
 
-  # Step 2: Push the Docker image to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
-    
+    # Step 2: Push the Docker image to Artifact Registry
+    - name: 'gcr.io/cloud-builders/docker'
+      args:
+        - 'push'
+        - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
+      
 
 
-  # Step 3: Trigger Cloud Deploy with inline Skaffold configuration
-  - name: 'google/cloud-sdk:latest'
-    id: Trigger Cloud Deploy
-    entrypoint: 'sh'
-    
-    args:
-      - -xe
-      - -c
-      - |
-    
-        gcloud deploy apply --file cloud-deploy/prod/pipeline.yaml --region=asia-south1
-        gcloud deploy apply --file cloud-deploy/prod/target.yaml --region=asia-south1	
+    # Step 3: Trigger Cloud Deploy with inline Skaffold configuration
+    - name: 'google/cloud-sdk:latest'
+      id: Trigger Cloud Deploy
+      entrypoint: 'sh'
+      
+      args:
+        - -xe
+        - -c
+        - |
+      
+          gcloud deploy apply --file cloud-deploy/prod/pipeline.yaml --region=asia-south1
+          gcloud deploy apply --file cloud-deploy/prod/target.yaml --region=asia-south1	
 
-        # Inline Skaffold configuration
-        cat <<EOF > skaffold.yaml	
-        apiVersion: skaffold/v4beta7
-        kind: Config
-        metadata:
-          name: php-app-01
-        profiles:
-          - name: prod
-            manifests:
-              rawYaml:
-                - cloud-deploy/prod/prod.yaml
-            deploy:
-              cloudrun: {}
-        EOF
+          # Inline Skaffold configuration
+          cat <<EOF > skaffold.yaml	
+          apiVersion: skaffold/v4beta7
+          kind: Config
+          metadata:
+            name: php-app-01
+          profiles:
+            - name: prod
+              manifests:
+                rawYaml:
+                  - cloud-deploy/prod/prod.yaml
+              deploy:
+                cloudrun: {}
+          EOF
 
 
-        gcloud deploy releases create php-app-01-${SHORT_SHA}-$(date +%s) \
-                            --delivery-pipeline=cdep-test --region=asia-south1
+          gcloud deploy releases create php-app-01-${SHORT_SHA}-$(date +%s) \
+                              --delivery-pipeline=cdep-test --region=asia-south1
+                              
+                                          
+
+    # Step to wait for 60 seconds
+    - name: 'alpine:latest'
+      entrypoint: 'sh'
+      args:
+        - '-c'
+        - 'sleep 30'                         
+
+    # Step 5: Apply the policy to allow unauthenticated access
+    - name: 'google/cloud-sdk:latest'
+      entrypoint: 'bash'
+      args:
+        - '-c'
+        - |
+          cat <<EOF > policy.yaml
+          bindings:
+          - members:
+            - allUsers
+            role: roles/run.invoker
+          EOF
+
+          gcloud run services set-iam-policy crn-test policy.yaml --region=asia-south1 -q  
+      
                             
-                                        
-
-   # Step to wait for 60 seconds
-  - name: 'alpine:latest'
-    entrypoint: 'sh'
-    args:
-      - '-c'
-      - 'sleep 30'                         
-
-   # Step 5: Apply the policy to allow unauthenticated access
-  - name: 'google/cloud-sdk:latest'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        cat <<EOF > policy.yaml
-        bindings:
-        - members:
-          - allUsers
-          role: roles/run.invoker
-        EOF
-
-        gcloud run services set-iam-policy crn-test policy.yaml --region=asia-south1 -q  
-    
                           
-                        
-  # Step to wait for 60 seconds
-  - name: 'alpine:latest'
-    entrypoint: 'sh'
-    args:
-      - '-c'
-      - 'sleep 60'
+    # Step to wait for 60 seconds
+    - name: 'alpine:latest'
+      entrypoint: 'sh'
+      args:
+        - '-c'
+        - 'sleep 60'
 
-  # Step 4: Check the status of the deployed service
-  - name: 'google/cloud-sdk:latest'
-    entrypoint: 'sh'
-    args:
-      - -xe
-      - -c
-      - |
-        echo "Checking Cloud Run service status..."
-        
-        # Get service-status
-        status=$(gcloud run services describe crn-test --region=asia-south1 --format="get(status.conditions[0].status)")
+    # Step 4: Check the status of the deployed service
+    - name: 'google/cloud-sdk:latest'
+      entrypoint: 'sh'
+      args:
+        - -xe
+        - -c
+        - |
+          echo "Checking Cloud Run service status..."
+          
+          # Get service-status
+          status=$(gcloud run services describe crn-test --region=asia-south1 --format="get(status.conditions[0].status)")
 
-        
-        if [ "$status" = "True" ]; then
-          echo "Deployment successful!"
-          exit 0
-        fi
-        echo "Deployment failed or service is not healthy (Status: $status). Rolling back to previous version."
-            
-        # Get the previous successful release
-        prev_release=$(gcloud deploy releases list \
-          --delivery-pipeline=cdep-test \
-          --region=asia-south1 --sort-by="~createTime" --format="value(name)" | \
-          while read release; do 
-            gcloud deploy rollouts list --delivery-pipeline=cdep-test \
-              --release="$release" --region=asia-south1 --filter="state=SUCCEEDED" \
-              --format="value(name)" | grep -q . && basename "$release" && break
-          done)
+          
+          if [ "$status" = "True" ]; then
+            echo "Deployment successful!"
+            exit 0
+          fi
+          echo "Deployment failed or service is not healthy (Status: $status). Rolling back to previous version."
+              
+          # Get the previous successful release
+          prev_release=$(gcloud deploy releases list \
+            --delivery-pipeline=cdep-test \
+            --region=asia-south1 --sort-by="~createTime" --format="value(name)" | \
+            while read release; do 
+              gcloud deploy rollouts list --delivery-pipeline=cdep-test \
+                --release="$release" --region=asia-south1 --filter="state=SUCCEEDED" \
+                --format="value(name)" | grep -q . && basename "$release" && break
+            done)
 
-        if [ -z "$prev_release" ]; then
-         echo "No previous successful release found for rollback. Exiting."
-         exit 1
-        fi  
-
-        echo "Rolling back to previous successful release: $prev_release"
-
-        # Deploy previous successful release
-        gcloud deploy releases promote \
-          --delivery-pipeline=cdep-test \
-          --region=asia-south1 \
-          --release="$prev_release" \
-          --to-target=prod \
-          --quiet  
-
-        echo "Waiting for rollback to complete..."
-        sleep 60
-
-        # Verify rollback
-        rollback_status=$(gcloud run services describe crn-test \
-          --region=asia-south1 \
-          --format="get(status.conditions[0].status)")
-
-        if [ "$rollback_status" = "True" ]; then
-          echo "Rollback completed successfully."
-          exit 0
-        else
-          echo "Rollback may have failed. Service status: $rollback_status"
+          if [ -z "$prev_release" ]; then
+          echo "No previous successful release found for rollback. Exiting."
           exit 1
-        fi
- 
+          fi  
 
-images:
-  - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
- 
+          echo "Rolling back to previous successful release: $prev_release"
 
-logsBucket: 'gs://bkt-goa-prod-cloud-logging-01'
+          # Deploy previous successful release
+          gcloud deploy releases promote \
+            --delivery-pipeline=cdep-test \
+            --region=asia-south1 \
+            --release="$prev_release" \
+            --to-target=prod \
+            --quiet  
+
+          echo "Waiting for rollback to complete..."
+          sleep 60
+
+          # Verify rollback
+          rollback_status=$(gcloud run services describe crn-test \
+            --region=asia-south1 \
+            --format="get(status.conditions[0].status)")
+
+          if [ "$rollback_status" = "True" ]; then
+            echo "Rollback completed successfully."
+            exit 0
+          else
+            echo "Rollback may have failed. Service status: $rollback_status"
+            exit 1
+          fi
+  
+
+  images:
+    - 'asia-south1-docker.pkg.dev/prj-prod-goa-smartforce-86/artifact-test/php-app-01:latest'
+  
+
+  logsBucket: 'gs://bkt-goa-prod-cloud-logging-01'
